@@ -2,10 +2,18 @@
 
 import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Effect, Either } from "effect";
 import { revalidatePath } from "next/cache";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,6 +32,7 @@ const formSchema = z.object({
 export default function EditUserSegment({
   initialUsers,
 }: EditUserSegmentProps) {
+  const router = useRouter();
   const [isDirty, setIsDirty] = useState(false);
 
   const form = useForm<{ users: User[] }>({
@@ -59,6 +68,13 @@ export default function EditUserSegment({
   return (
     <form onSubmit={form.handleSubmit(onSubmit)}>
       <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Segments</TableHead>
+            <TableHead>Impersonate User</TableHead>
+          </TableRow>
+        </TableHeader>
         <TableBody>
           {fields.map((field, index) => (
             <TableRow key={field.id}>
@@ -69,6 +85,18 @@ export default function EditUserSegment({
                   defaultValue={field.segments}
                   onValueChange={(value) => handleSegmentChange(index, value)}
                 />
+              </TableCell>
+              <TableCell>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    document.cookie = `user=${encodeURIComponent(field.name)}; path=/`;
+                    router.push("/");
+                  }}
+                >
+                  Impersonate
+                </Button>
               </TableCell>
             </TableRow>
           ))}

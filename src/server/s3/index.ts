@@ -1,6 +1,8 @@
-"use server";
-
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Effect } from "effect";
 import { Resource } from "sst";
@@ -8,40 +10,40 @@ import { z } from "zod";
 import { env } from "../../utils/env";
 
 const s3Client = new S3Client({
-  region: env.AWS_REGION
+  region: env.AWS_REGION,
 });
 
 const getS3UploadUrl = (key: string) => {
   const command = new PutObjectCommand({
     Key: key,
-    Bucket: Resource.TestBucket.name
+    Bucket: Resource.TestBucket.name,
   });
   return getSignedUrl(s3Client, command);
 };
 
 export const readJsonFromS3 = <T extends z.ZodSchema>(key: string, schema: T) =>
-  Effect.tryPromise<z.infer<T>>(() =>
-    s3Client
-      .send(new GetObjectCommand({ Bucket: Resource.TestBucket.name, Key: key }))
-      .then(async (response) => {
-        const bodyContents = await response.Body?.transformToString();
+  Effect.gen(function* () {
+    const response = yield* Effect.tryPromise(() =>
+      s3Client
+        .send(
+          new GetObjectCommand({ Bucket: Resource.TestBucket.name, Key: key }),
+        )
+        .then((r) => r.Body?.transformToString()),
+    );
 
-        if (!bodyContents) {
-          throw new Error("No body contents");
-        }
+    if (!response) {
+      return yield* Effect.fail("Failed to read from S3");
+    }
 
-        return schema.parse(JSON.parse(bodyContents));
-      })
-  ).pipe(Effect.tap(() => Effect.log({
-    message: "Successfully read JSON from S3",
-    key,
-    bucket: Resource.TestBucket.name
-  })), Effect.tapError(e => Effect.logError({
-    message: "Error reading JSON from S3",
-    key,
-    error: e,
-    bucket: Resource.TestBucket.name
-  })), Effect.catchAll(() => Effect.succeed(undefined)));
+    const json = yield* Effect.try(() => JSON.parse(response));
+
+    const parsed: z.infer<T> = yield* Effect.tryPromise({
+      try: () => schema.parseAsync(json),
+      catch: () => "JSON is not matching schema",
+    });
+
+    return parsed;
+  }).pipe(Effect.tapError(Effect.logError));
 
 export const uploadJsonToS3 = (Key: string, data: object) =>
   Effect.tryPromise(async () => {
