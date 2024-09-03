@@ -1,23 +1,24 @@
 import { getUser } from '@/utils/user';
+import { Effect } from 'effect';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { match, P } from 'ts-pattern';
-import { AbTestingRoutes } from './app/api/ab-testing/route';
+import { getSegments } from './lib/queries/segments';
 
 const findMatchingRoute = (routes: string[], path: string) =>
     routes.find(route => path === '/' ? route.startsWith('/home-') : path.startsWith(route));
 
 export async function middleware(request: NextRequest) {
-    return NextResponse.next();
     const user = getUser();
     const path = request.nextUrl.pathname;
-    const host = request.headers.get("referer")
 
-    const abTestingRoutes = await fetch(host + '/api/ab-testing').then(res => res.json() as Promise<AbTestingRoutes>);
+    const segments = await Effect.runPromise(getSegments);
+
+    if (!segments || segments.length === 0) return NextResponse.next();
 
     return match({ user, path })
         .with({ user: { segment: P.string } }, ({ user, path }) => {
-            const segmentRoutes = abTestingRoutes[user.segment];
+            const segmentRoutes = segments.find(segment => segment.name === user.segment)?.routes;
             if (!segmentRoutes) return NextResponse.next();
 
             const matchingRoute = findMatchingRoute(segmentRoutes, path);

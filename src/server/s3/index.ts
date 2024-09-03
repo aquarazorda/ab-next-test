@@ -3,9 +3,10 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Effect } from "effect";
 import { Resource } from "sst";
 import { z } from "zod";
+import { env } from "../../utils/env";
 
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
+  region: env.AWS_REGION
 });
 
 const getS3UploadUrl = (key: string) => {
@@ -29,7 +30,12 @@ export const readJsonFromS3 = <T extends z.ZodSchema>(key: string, schema: T) =>
 
         return schema.parse(JSON.parse(bodyContents));
       })
-  );
+  ).pipe(Effect.tapError(e => Effect.logError({
+    message: "Error reading JSON from S3",
+    key,
+    error: e,
+    bucket: Resource.TestBucket.name
+  })));
 
 export const uploadJsonToS3 = (Key: string, data: object) =>
   Effect.tryPromise(async () => {
