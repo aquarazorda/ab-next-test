@@ -8,6 +8,7 @@ const findMatchingRoute = (routes: string[], path: string) =>
     routes.find(route => path === '/' ? route.startsWith('/home-') : path.startsWith(route));
 
 export async function middleware(request: NextRequest) {
+    return NextResponse.next();
     const user = getUser();
     const path = request.nextUrl.pathname;
     const host = request.headers.get("referer")
