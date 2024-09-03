@@ -1,3 +1,5 @@
+"use server";
+
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Effect } from "effect";
@@ -30,12 +32,16 @@ export const readJsonFromS3 = <T extends z.ZodSchema>(key: string, schema: T) =>
 
         return schema.parse(JSON.parse(bodyContents));
       })
-  ).pipe(Effect.tapError(e => Effect.logError({
+  ).pipe(Effect.tap(() => Effect.log({
+    message: "Successfully read JSON from S3",
+    key,
+    bucket: Resource.TestBucket.name
+  })), Effect.tapError(e => Effect.logError({
     message: "Error reading JSON from S3",
     key,
     error: e,
     bucket: Resource.TestBucket.name
-  })));
+  })), Effect.catchAll(() => Effect.succeed(undefined)));
 
 export const uploadJsonToS3 = (Key: string, data: object) =>
   Effect.tryPromise(async () => {
